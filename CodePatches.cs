@@ -23,7 +23,7 @@ namespace CustomBackpack
         public static ClickableTextureComponent expandButton;
 
         public class ObjectPatches {
-            public static void InventoryMenu_Postfix(InventoryMenu __instance, int xPosition, int yPosition, bool playerInventory, IList<Item> actualInventory, InventoryMenu.highlightThisItem highlightMethod, int capacity, int rows, int horizontalGap, int verticalGap, bool drawSlots, bool highlightSelected)
+            public static void InventoryMenu_Postfix(InventoryMenu __instance, int xPosition, int yPosition, bool playerInventory, IList<Item> actualInventory, InventoryMenu.highlightThisItem highlightMethod, int capacity, int rows, int horizontalGap, int verticalGap, bool drawSlots)
             {
                 if (!Config.ModEnabled || (__instance.actualInventory != Game1.player.Items) || __instance.capacity >= __instance.actualInventory.Count)
                     return;
@@ -34,6 +34,7 @@ namespace CustomBackpack
                 oldRows.Value = rows;
                 oldCapacity.Value = capacity;
 
+                SMonitor.Log($"Created new inventory menu with {__instance.actualInventory.Count} slots");
                 upArrow = new ClickableTextureComponent(new Rectangle(__instance.xPositionOnScreen + 768 + 32 - 50, __instance.yPositionOnScreen - 46, 24, 24), Game1.mouseCursors, Game1.getSourceRectForStandardTileSheet(Game1.mouseCursors, 12, -1, -1), 0.4f, false)
                 {
                     myID = 88,
@@ -141,6 +142,8 @@ namespace CustomBackpack
                 {
                     var bounds = __instance.inventory[scrolled.Value * __instance.capacity / __instance.rows].bounds;
                     Game1.setMousePosition(bounds.Right - bounds.Width / 8, bounds.Bottom - bounds.Height / 8);
+                    var x = Game1.getMousePosition();
+                    var y = x;
                 }
             }
 
@@ -180,11 +183,12 @@ namespace CustomBackpack
                 if (!menu.Scrolling())
                     return true;
                 int columns = menu.Columns();
-                if(__instance is ItemGrabMenu igm && menu.inventory != null && menu.inventory.Count >= igm.GetColumnCount())
+                if(__instance is ItemGrabMenu && menu.inventory != null && menu.inventory.Count >= (__instance as ItemGrabMenu).GetColumnCount())
                 {
+                    SMonitor.Log($"items to grab {(__instance as ItemGrabMenu).ItemsToGrabMenu.inventory.Count}");
                     for (int i = 0; i < columns; i++)
                     {
-                        menu.inventory[i + menu.GetOffset()].upNeighborID = (igm.shippingBin ? 12598 : (Math.Min(i, igm.ItemsToGrabMenu.inventory.Count - 1) + 53910));
+                        menu.inventory[i + menu.GetOffset()].upNeighborID = ((__instance as ItemGrabMenu).shippingBin ? 12598 : (Math.Min(i, (__instance as ItemGrabMenu).ItemsToGrabMenu.inventory.Count - 1) + 53910));
                     }
                 }
                 else if(__instance is GeodeMenu && menu.inventory != null)
@@ -218,9 +222,9 @@ namespace CustomBackpack
                 {
                     __instance.currentlySnappedComponent = __instance.getComponentWithID(IDOffset);
                 }
-                else if (direction == 2 && __instance is ItemGrabMenu igm2 && old.myID >= 53910 + igm2.ItemsToGrabMenu.capacity  - igm2.ItemsToGrabMenu.Columns() && old.myID < 53910 + igm2.ItemsToGrabMenu.capacity)
+                else if (direction == 2 && __instance is ItemGrabMenu && old.myID >= 53910 + (__instance as ItemGrabMenu).ItemsToGrabMenu.capacity  - (__instance as ItemGrabMenu).ItemsToGrabMenu.Columns() && old.myID < 53910 + (__instance as ItemGrabMenu).ItemsToGrabMenu.capacity)
                 {
-                    int idx = IDOffset + (old.myID - 53910) % igm2.ItemsToGrabMenu.Columns();
+                    int idx = IDOffset + (old.myID - 53910) % (__instance as ItemGrabMenu).ItemsToGrabMenu.Columns();
                     __instance.currentlySnappedComponent = __instance.getComponentWithID(idx);
                 }
                 else if (direction == 0 && old.myID >= IDOffset && old.myID < IDOffset + columns && scrolled.Value > 0)
@@ -230,11 +234,13 @@ namespace CustomBackpack
                 }
                 else if (direction == 2 && old.myID >= IDOffset + menu.capacity - columns && old.myID < IDOffset + menu.capacity && scrolled.Value < (menu.actualInventory.Count  / columns) - menu.rows)
                 {
+                    SMonitor.Log($"a {direction}, {old.myID}, {old.upNeighborID}, {old.downNeighborID}");
                     ChangeScroll(menu, 1);
                     __instance.currentlySnappedComponent = __instance.getComponentWithID(old.myID + columns);
                 }
                 else
                 {
+                    SMonitor.Log($"b {direction}, {old.myID}, {old.upNeighborID}, {old.downNeighborID}");
                     return true;
                 }
                 __instance.snapCursorToCurrentSnappedComponent();
@@ -260,6 +266,7 @@ namespace CustomBackpack
                             menu.inventory[i + menu.GetOffset()].upNeighborID = (__instance.shippingBin ? 12598 : (Math.Min(i, __instance.ItemsToGrabMenu.inventory.Count - 1) + 53910));
                         }
                     }
+                    SMonitor.Log($"{oldID}, {menu.capacity}, {scrolled.Value}");
                     if (oldID >= IDOffset && oldID < IDOffset + menu.capacity && oldID >= IDOffset + menu.capacity - columns && scrolled.Value < menu.actualInventory.Count / columns - menu.rows)
                     {
                         ChangeScroll(menu, 1);
@@ -321,6 +328,7 @@ namespace CustomBackpack
                     __instance.inventory = new List<ClickableComponent>(__instance.inventory.Skip(__instance.capacity / __instance.rows * scrolled.Value).Take(__instance.capacity));
                 } catch (Exception ex)
                 {
+                    SMonitor.Log($"Failed in {nameof(InventoryMenu_draw_Prefix)}:\n{ex}", LogLevel.Error);
                 }
             }
             public static void InventoryMenu_draw_Postfix(SpriteBatch b, InventoryMenu __instance, ref object[] __state)
@@ -334,6 +342,7 @@ namespace CustomBackpack
                     DrawUIElements(b, __instance);
                 } catch (Exception ex)
                 {
+                    SMonitor.Log($"Failed in {nameof(InventoryMenu_draw_Postfix)}:\n{ex}", LogLevel.Error);
                 }
             }
 
@@ -373,6 +382,7 @@ namespace CustomBackpack
                 {
                     if (Game1.player.maxItems.Value < i)
                     {
+                        SMonitor.Log($"showing dialogue to buy backpack {dataDict[i].name} for {dataDict[i].cost}");
                         __instance.createQuestionDialogue(string.Format(SHelper.Translation.Get("backpack-upgrade-x"), i), new Response[]
                         {
                             new Response("Purchase", string.Format(SHelper.Translation.Get("buy-backpack-for-x"), dataDict[i].cost)),
@@ -397,9 +407,14 @@ namespace CustomBackpack
                     {
                         if (Game1.player.Money >= dataDict[i].cost)
                         {
+                            SMonitor.Log($"buying backpack {dataDict[i].name} for {dataDict[i].cost}");
                             Game1.player.Money -= dataDict[i].cost;
                             SetPlayerSlots(i);
                             Game1.player.holdUpItemThenMessage(new SpecialItem(99, dataDict[i].name), true);
+                            ((Multiplayer)typeof(Game1).GetField("multiplayer", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static).GetValue(Game1.game1)).globalChatInfoMessage($"CustomBackpack_{i}", new string[]
+                            {
+                                Game1.player.Name
+                            });
                         }
                         else
                         {
@@ -454,14 +469,24 @@ namespace CustomBackpack
                 if (right)
                 {
                     List<Item> toMove = toAlter.Take(12).ToList();
-                    toAlter.RemoveRange(0, 12);
+                    for (int i = 0; i < toMove.Count; i++)
+                    {
+                        toAlter.RemoveAt(0);
+                    }
                     toAlter.AddRange(toMove);
                 }
                 else
                 {
                     List<Item> toMove = toAlter.Skip(toAlter.Count - 12).Take(12).ToList();
-                    toAlter.RemoveRange(toAlter.Count - 12, 12);
-                    toAlter.InsertRange(0, toMove);
+                    for (int i = 0; i < toAlter.Count - 12; i++)
+                    {
+                        toMove.Add(toAlter[i]);
+                    }
+                    for (int i = 0; i < toMove.Count; i++)
+                    {
+                        toAlter[i] = toMove[i];
+                    }
+
                 }
                 for (int i = 0; i < toAlter.Count; i++)
                 {
@@ -475,29 +500,13 @@ namespace CustomBackpack
                 }
                 for (int j = 0; j < Game1.onScreenMenus.Count; j++)
                 {
-                    if (Game1.onScreenMenus[j] is Toolbar tb)
+                    if (Game1.onScreenMenus[j] is Toolbar)
                     {
-                        tb.shifted(right);
+                        (Game1.onScreenMenus[j] as Toolbar).shifted(right);
+                        return false;
                     }
                 }
                 return false;
-            }
-        }
-
-        public class FullInventoryPage : InventoryPage
-        {
-            public FullInventoryPage(int x, int y, int width, int height) : base(x, y, width, height) { }
-
-            public override void receiveLeftClick(int x, int y, bool playSound = true)
-            {
-                base.receiveLeftClick(x, y, playSound);
-                Game1.onInventoryItemChanged();
-            }
-
-            public override void receiveRightClick(int x, int y, bool playSound = true)
-            {
-                base.receiveRightClick(x, y, playSound);
-                Game1.onInventoryItemChanged();
             }
         }
     }
