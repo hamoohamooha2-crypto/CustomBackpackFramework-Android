@@ -1,25 +1,49 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
-    <Version>1.1.0</Version>
-    <TargetFramework>net6.0</TargetFramework>
-	<EnableHarmony>true</EnableHarmony>
-	<Platforms>AnyCPU</Platforms>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.4.0" />
+    <Reference Include="StardewModdingAPI">
+      <HintPath>lib/StardewModdingAPI.dll</HintPath>
+    </Reference>
+
+    <Reference Include="StardewValley">
+      <HintPath>lib/StardewValley.dll</HintPath>
+    </Reference>
+
+    <Reference Include="HarmonyLib">
+      <HintPath>lib/0Harmony.dll</HintPath>
+    </Reference>
+    
+    <Reference Include="MonoGame.Framework">
+      <HintPath>lib/MonoGame.Framework.dll</HintPath>
+    </Reference>
+
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>lib/Newtonsoft.Json.dll</HintPath>
+    </Reference>
+
+     <Reference Include="SMAPI.Toolkit.CoreInterfaces">
+      <HintPath>lib/SMAPI.Toolkit.CoreInterfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="TMXTile">
+      <HintPath>lib/TMXTile.dll</HintPath>
+    </Reference>
+    <Reference Include="xTile">
+      <HintPath>lib/xTile.dll</HintPath>
+    </Reference>
+
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="assets\board.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="i18n\default.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="manifest.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    <None Include="assets\**\*" CopyToOutputDirectory="Always" />
   </ItemGroup>
+
 </Project>
