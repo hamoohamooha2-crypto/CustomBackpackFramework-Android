@@ -1,4 +1,4 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
@@ -507,6 +507,23 @@ namespace CustomBackpack
                     }
                 }
                 return false;
+            }
+        }
+
+        public class FullInventoryPage : InventoryPage
+        {
+            public FullInventoryPage(int x, int y, int width, int height) : base(x, y, width, height) { }
+
+            public override void receiveLeftClick(int x, int y, bool playSound = true)
+            {
+                base.receiveLeftClick(x, y, playSound);
+                this.checkForSelectedItems();
+            }
+
+            public override void receiveRightClick(int x, int y, bool playSound = true)
+            {
+                base.receiveRightClick(x, y, playSound);
+                this.checkForSelectedItems();
             }
         }
     }
