@@ -54,7 +54,7 @@ namespace CustomBackpack
             trashCan.bounds.Y = organizeButton.bounds.Y + 256;
             trashCan.draw(b);
             b.Draw(Game1.mouseCursors, new Vector2(trashCan.bounds.X + 60, trashCan.bounds.Y + 40), new Rectangle?(new Rectangle(564 + Game1.player.trashCanLevel * 18, 129, 18, 10)), Color.White, trashCanLidRotation, new Vector2(16f, 10f), 4f, SpriteEffects.None, 0.86f);
-            if (HeldItem(null))
+            if (heldItem(null))
             {
                 Game1.player.CursorSlotItem.drawInMenu(b, new Vector2(Game1.getOldMouseX() + 16, Game1.getOldMouseY() + 16), 1f);
             }
@@ -66,7 +66,7 @@ namespace CustomBackpack
                 }
                 else
                 {
-                    drawToolTip(b, hoverText, hoverTitle, hoveredItem, HeldItem(null), -1, 0, null, -1, null, -1);
+                    drawToolTip(b, hoverText, hoverTitle, hoveredItem, heldItem(null), -1, 0, null, -1, null, -1);
                 }
             }
             drawMouse(b);
