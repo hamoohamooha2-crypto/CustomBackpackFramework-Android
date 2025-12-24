@@ -179,11 +179,7 @@ namespace CustomBackpack
 
             configMenu.Register(mod: ModManifest, reset: () => Config = new ModConfig(), save: () => Helper.WriteConfig(Config));
             configMenu.AddBoolOption(mod: ModManifest, name: () => ModEntry.SHelper.Translation.Get("GMCM_Option_ModEnabled_Name"), getValue: () => Config.ModEnabled, setValue: value => Config.ModEnabled = value);
-            configMenu.AddBoolOption(mod: ModManifest, name: () => ModEntry.SHelper.Translation.Get("GMCM_Option_ShowArrows_Name"), getValue: () => Config.ShowArrows, setValue: value => Config.ShowArrows = value);
-            configMenu.AddBoolOption(mod: ModManifest, name: () => ModEntry.SHelper.Translation.Get("GMCM_Option_ShowRowNumbers_Name"), getValue: () => Config.ShowRowNumbers, setValue: value => Config.ShowRowNumbers = value);
             configMenu.AddNumberOption(mod: ModManifest, name: () => ModEntry.SHelper.Translation.Get("GMCM_Option_MinHandleHeight_Name"), getValue: () => Config.MinHandleHeight, setValue: value => Config.MinHandleHeight = value);
-            configMenu.AddKeybind(mod: ModManifest, name: () => ModEntry.SHelper.Translation.Get("GMCM_Option_ShowExpandedButton_Name"), getValue: () => Config.ShowExpandedButton, setValue: value => Config.ShowExpandedButton = value);
-            configMenu.AddNumberOption(mod: ModManifest, name: () => ModEntry.SHelper.Translation.Get("GMCM_Option_ShiftRows_Name"), getValue: () => Config.ShiftRows, setValue: value => Config.ShiftRows = value);
         }
     }
 }
