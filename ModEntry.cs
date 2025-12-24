@@ -28,21 +28,21 @@ namespace CustomBackpack
         public static int IDOffset = 0;
         public static Texture2D scrollTexture;
         public static Texture2D handleTexture;
-        public static PerScreen<IClickableMenu> lastMenu = new PerScreen<IClickableMenu>();
-        public static PerScreen<int> pressTime = new PerScreen<int>();
-        public static PerScreen<int> oldScrollValue = new PerScreen<int>();
-        public static PerScreen<int> oldCapacity = new PerScreen<int>();
-        public static PerScreen<int> oldRows = new PerScreen<int>();
-        public static PerScreen<int> oldScrolled = new PerScreen<int>();
-        public static PerScreen<int> scrolled = new PerScreen<int>();
-        public static PerScreen<int> scrollChange = new PerScreen<int>();
-        public static PerScreen<int> scrollWidth = new PerScreen<int>(() => 4);
-        public static PerScreen<bool> scrolling = new PerScreen<bool>();
-        public static PerScreen<Rectangle> scrollArea = new PerScreen<Rectangle>();
+        public static PerScreen<IClickableMenu> lastMenu = new();
+        public static PerScreen<int> pressTime = new();
+        public static PerScreen<int> oldScrollValue = new();
+        public static PerScreen<int> oldCapacity = new();
+        public static PerScreen<int> oldRows = new();
+        public static PerScreen<int> oldScrolled = new();
+        public static PerScreen<int> scrolled = new();
+        public static PerScreen<int> scrollChange = new();
+        public static PerScreen<int> scrollWidth = new(() => 4);
+        public static PerScreen<bool> scrolling = new();
+        public static PerScreen<Rectangle> scrollArea = new();
 
         public override void Entry(IModHelper helper)
         {
-            Config = Helper.ReadConfig<ModConfig>();
+            Config = helper.ReadConfig<ModConfig>();
             if (!Config.ModEnabled) return;
 
             context = this;
@@ -62,24 +62,24 @@ namespace CustomBackpack
             PatchHandler.SafePatchAll(harmony, typeof(ObjectPatches), Monitor);
 
             scrollTexture = new Texture2D(Game1.graphics.GraphicsDevice, 1, 1);
-            scrollTexture.SetData(new Color[] { Config.BackgroundColor });
+            scrollTexture.SetData(new[] { Config.BackgroundColor });
             handleTexture = new Texture2D(Game1.graphics.GraphicsDevice, 1, 1);
-            handleTexture.SetData(new Color[] { Config.HandleColor });
+            handleTexture.SetData(new[] { Config.HandleColor });
         }
 
         private void GameLoop_UpdateTicked(object sender, StardewModdingAPI.Events.UpdateTickedEventArgs e)
         {
-            if (scrolling.Value && (Game1.activeClickableMenu is null || Game1.input.GetMouseState().LeftButton != ButtonState.Pressed))
+            if (scrolling.Value && (Game1.activeClickableMenu == null || Game1.input.GetMouseState().LeftButton != ButtonState.Pressed))
                 scrolling.Value = false;
-            
-            var newScrollValue = Game1.input.GetMouseState().ScrollWheelValue;
-            scrollChange.Value = (oldScrollValue.Value > newScrollValue) ? 1 : (oldScrollValue.Value < newScrollValue ? -1 : 0);
+
+            int newScrollValue = Game1.input.GetMouseState().ScrollWheelValue;
+            scrollChange.Value = oldScrollValue.Value > newScrollValue ? 1 : oldScrollValue.Value < newScrollValue ? -1 : 0;
             oldScrollValue.Value = newScrollValue;
         }
 
         private void Input_ButtonPressed(object sender, StardewModdingAPI.Events.ButtonPressedEventArgs e)
         {
-            if (Game1.activeClickableMenu is not null && e.Button == SButton.MouseLeft && scrollArea.Value.Contains(Game1.getMouseX(), Game1.getMouseY()))
+            if (Game1.activeClickableMenu != null && e.Button == SButton.MouseLeft && scrollArea.Value.Contains(Game1.getMouseX(), Game1.getMouseY()))
                 scrolling.Value = true;
         }
 
@@ -109,7 +109,7 @@ namespace CustomBackpack
                 dataDict = Game1.content.Load<Dictionary<int, BackPackData>>(dictPath);
                 if (dataDict == null) return;
                 foreach (var key in dataDict.Keys.ToArray())
-                    dataDict[key].texture = Helper.GameContent.Load<Texture2D>(dataDict[key].texturePath);
+                    dataDict[key].texture = SHelper.GameContent.Load<Texture2D>(dataDict[key].texturePath);
                 SHelper.GameContent.InvalidateCache("String/UI");
             }
             catch { }
@@ -127,17 +127,17 @@ namespace CustomBackpack
         {
             var editor = obj.AsDictionary<string, string>();
             foreach (var key in dataDict.Keys.ToArray())
-                editor.Data[$"Chat_CustomBackpack_{key}"] = string.Format(SHelper.Translation.Get("farmer-bought-x"));
+                editor.Data[$"Chat_CustomBackpack_{key}"] = SHelper.Translation.Get("farmer-bought-x");
         }
 
         private void GameLoop_GameLaunched(object sender, StardewModdingAPI.Events.GameLaunchedEventArgs e)
         {
-            var configMenu = this.Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
-            if (configMenu is null) return;
+            var configMenu = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
+            if (configMenu == null) return;
 
-            configMenu.Register(mod: ModManifest, reset: () => Config = new ModConfig(), save: () => Helper.WriteConfig(Config));
-            configMenu.AddBoolOption(mod: ModManifest, name: () => ModEntry.SHelper.Translation.Get("GMCM_Option_ModEnabled_Name"), getValue: () => Config.ModEnabled, setValue: value => Config.ModEnabled = value);
-            configMenu.AddNumberOption(mod: ModManifest, name: () => ModEntry.SHelper.Translation.Get("GMCM_Option_MinHandleHeight_Name"), getValue: () => Config.MinHandleHeight, setValue: value => Config.MinHandleHeight = value);
+            configMenu.Register(ModManifest, () => Config = new ModConfig(), () => Helper.WriteConfig(Config));
+            configMenu.AddBoolOption(ModManifest, () => SHelper.Translation.Get("GMCM_Option_ModEnabled_Name"), () => Config.ModEnabled, v => Config.ModEnabled = v);
+            configMenu.AddNumberOption(ModManifest, () => SHelper.Translation.Get("GMCM_Option_MinHandleHeight_Name"), () => Config.MinHandleHeight, v => Config.MinHandleHeight = v);
         }
     }
 
@@ -145,44 +145,33 @@ namespace CustomBackpack
     {
         public static void SafePatchAll(Harmony harmony, Type patchClass, IMonitor monitor)
         {
-            PatchSafe(harmony, monitor, patchClass, FindConstructor(typeof(InventoryMenu)), null, "InventoryMenu_Postfix", "InventoryMenu Constructor");
-            PatchSafe(harmony, monitor, patchClass, FindMethod(typeof(InventoryMenu), "draw"), "InventoryMenu_draw_Prefix", "InventoryMenu_draw_Postfix", "InventoryMenu Draw");
-            PatchSafe(harmony, monitor, patchClass, FindMethod(typeof(InventoryMenu), "rightClick"), "InventoryMenu_rightClick_Prefix", null, "InventoryMenu RightClick");
-            PatchSafe(harmony, monitor, patchClass, FindMethod(typeof(InventoryMenu), "leftClick"), "InventoryMenu_leftClick_Prefix", null, "InventoryMenu LeftClick");
-            PatchSafe(harmony, monitor, patchClass, FindMethod(typeof(InventoryMenu), "hover"), "InventoryMenu_hover_Prefix", null, "InventoryMenu Hover");
-            PatchSafe(harmony, monitor, patchClass, FindMethod(typeof(InventoryMenu), "getInventoryPositionOfClick"), "InventoryMenu_getInventoryPositionOfClick_Prefix", null, "InventoryMenu ClickPos");
-            PatchSafe(harmony, monitor, patchClass, FindMethod(typeof(GameLocation), "performAction"), "GameLocation_performAction_Prefix", null, "GameLocation PerformAction");
-            PatchSafe(harmony, monitor, patchClass, FindMethod(typeof(GameLocation), "answerDialogueAction"), "GameLocation_answerDialogueAction_Prefix", null, "GameLocation AnswerDialogue");
-            PatchSafe(harmony, monitor, patchClass, AccessTools.Method(typeof(Farmer), "shiftToolbar"), "Farmer_shiftToolbar_Prefix", null, "Farmer ShiftToolbar");
-            PatchSafe(harmony, monitor, patchClass, AccessTools.Method(typeof(IClickableMenu), "applyMovementKey"), "IClickableMenu_applyMovementKey_Prefix", null, "MovementKey");
-            PatchSafe(harmony, monitor, patchClass, AccessTools.Method(typeof(InventoryMenu), "setUpForGamePadMode"), null, "InventoryMenu_setUpForGamePadMode_Postfix", "GamePadMode");
+            Patch(harmony, patchClass, typeof(InventoryMenu).GetConstructors().OrderByDescending(c => c.GetParameters().Length).FirstOrDefault(), null, "InventoryMenu_Postfix", monitor);
+            Patch(harmony, patchClass, AccessTools.Method(typeof(InventoryMenu), "draw"), "InventoryMenu_draw_Prefix", "InventoryMenu_draw_Postfix", monitor);
+            Patch(harmony, patchClass, AccessTools.Method(typeof(InventoryMenu), "rightClick"), "InventoryMenu_rightClick_Prefix", null, monitor);
+            Patch(harmony, patchClass, AccessTools.Method(typeof(InventoryMenu), "leftClick"), "InventoryMenu_leftClick_Prefix", null, monitor);
+            Patch(harmony, patchClass, AccessTools.Method(typeof(InventoryMenu), "hover"), "InventoryMenu_hover_Prefix", null, monitor);
+            Patch(harmony, patchClass, AccessTools.Method(typeof(InventoryMenu), "getInventoryPositionOfClick"), "InventoryMenu_getInventoryPositionOfClick_Prefix", null, monitor);
+            Patch(harmony, patchClass, AccessTools.Method(typeof(GameLocation), nameof(GameLocation.performAction), new[] { typeof(string), typeof(Farmer), typeof(Location) }), "GameLocation_performAction_Prefix", null, monitor);
+            Patch(harmony, patchClass, AccessTools.Method(typeof(GameLocation), nameof(GameLocation.answerDialogueAction)), "GameLocation_answerDialogueAction_Prefix", null, monitor);
+            Patch(harmony, patchClass, AccessTools.Method(typeof(Farmer), nameof(Farmer.shiftToolbar)), "Farmer_shiftToolbar_Prefix", null, monitor);
+            Patch(harmony, patchClass, AccessTools.Method(typeof(IClickableMenu), nameof(IClickableMenu.applyMovementKey)), "IClickableMenu_applyMovementKey_Prefix", null, monitor);
+            Patch(harmony, patchClass, AccessTools.Method(typeof(InventoryMenu), nameof(InventoryMenu.setUpForGamePadMode)), null, "InventoryMenu_setUpForGamePadMode_Postfix", monitor);
         }
 
-        private static MethodBase FindConstructor(Type type)
-        {
-            return type.GetConstructors().OrderByDescending(c => c.GetParameters().Length).FirstOrDefault();
-        }
-
-        private static MethodBase FindMethod(Type type, string name)
-        {
-            return type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static)
-                       .Where(m => m.Name == name)
-                       .OrderByDescending(m => m.GetParameters().Length)
-                       .FirstOrDefault();
-        }
-
-        private static void PatchSafe(Harmony harmony, IMonitor monitor, Type patchClass, MethodBase original, string prefixName, string postfixName, string debugName)
+        private static void Patch(Harmony harmony, Type patchClass, MethodBase original, string prefix, string postfix, IMonitor monitor)
         {
             if (original == null) return;
             try
             {
-                HarmonyMethod prefix = prefixName != null ? new HarmonyMethod(patchClass, prefixName) : null;
-                HarmonyMethod postfix = postfixName != null ? new HarmonyMethod(patchClass, postfixName) : null;
-                harmony.Patch(original, prefix, postfix);
+                harmony.Patch(
+                    original,
+                    prefix != null ? new HarmonyMethod(patchClass, prefix) : null,
+                    postfix != null ? new HarmonyMethod(patchClass, postfix) : null
+                );
             }
-            catch (Exception ex)
+            catch (Exception e)
             {
-                monitor.Log($"Failed to patch {debugName}: {ex.Message}", LogLevel.Error);
+                monitor.Log(e.ToString(), LogLevel.Error);
             }
         }
     }
