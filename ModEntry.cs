@@ -58,7 +58,7 @@ namespace CustomBackpack
             helper.Events.Content.AssetRequested += Content_AssetRequested;
             helper.Events.GameLoop.GameLaunched += GameLoop_GameLaunched;
             helper.Events.GameLoop.SaveLoaded += GameLoop_SaveLoaded;
-            helper.Events.DayStarted += GameLoop_DayStarted;
+            helper.Events.GameLoop.DayStarted += GameLoop_DayStarted;
             helper.Events.Input.ButtonPressed += Input_ButtonPressed;
             helper.Events.GameLoop.UpdateTicked += GameLoop_UpdateTicked;
 
@@ -192,6 +192,15 @@ namespace CustomBackpack
             if (arg2.Length == 1 && int.TryParse(arg2[0], out int slots))
             {
                 SetPlayerSlots(slots);
+            }
+        }
+
+        public void SetPlayerSlots(int slots)
+        {
+            Game1.player.MaxItems = slots;
+            while (Game1.player.Items.Count < Game1.player.MaxItems)
+            {
+                Game1.player.Items.Add(null);
             }
         }
 
