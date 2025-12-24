@@ -1,4 +1,4 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -16,15 +16,12 @@ using Rectangle = Microsoft.Xna.Framework.Rectangle;
 
 namespace CustomBackpack
 {
-    /// <summary>The mod entry point.</summary>
     public partial class ModEntry : Mod
     {
-
         public static IMonitor SMonitor;
         public static IModHelper SHelper;
         public static ModConfig Config;
         public static ModEntry context;
-
 
         public static string dictPath = "platinummyr.CustomBackpackFramework/dictionary";
 
@@ -46,8 +43,6 @@ namespace CustomBackpack
         public static PerScreen<bool> scrolling = new PerScreen<bool>();
         public static PerScreen<Rectangle> scrollArea = new PerScreen<Rectangle>();
 
-        /// <summary>The mod entry point, called after the mod is first loaded.</summary>
-        /// <param name="helper">Provides simplified APIs for writing mods.</param>
         public override void Entry(IModHelper helper)
         {
             Config = Helper.ReadConfig<ModConfig>();
@@ -61,19 +56,18 @@ namespace CustomBackpack
             SHelper = helper;
 
             helper.Events.Content.AssetRequested += Content_AssetRequested;
-
             helper.Events.GameLoop.GameLaunched += GameLoop_GameLaunched;
             helper.Events.GameLoop.SaveLoaded += GameLoop_SaveLoaded;
             helper.Events.GameLoop.DayStarted += GameLoop_DayStarted;
             helper.Events.Input.ButtonPressed += Input_ButtonPressed;
-            helper.Events.GameLoop.UpdateTicked += GameLoop_UpdateTicked; ;
+            helper.Events.GameLoop.UpdateTicked += GameLoop_UpdateTicked;
 
             helper.ConsoleCommands.Add("custombackpack", "Manually set backpack slots. Usage: custombackpack <slotnumber>", SetSlots);
 
             var harmony = new Harmony(ModManifest.UniqueID);
 
             harmony.Patch(
-                original: AccessTools.Constructor(typeof(InventoryMenu), new Type[] { typeof(int), typeof(int), typeof(bool), typeof(IList<Item>), typeof(InventoryMenu.highlightThisItem), typeof(int), typeof(int), typeof(int), typeof(int), typeof(bool) }),
+                original: AccessTools.Constructor(typeof(InventoryMenu), new Type[] { typeof(int), typeof(int), typeof(bool), typeof(IList<Item>), typeof(InventoryMenu.highlightThisItem), typeof(int), typeof(int), typeof(int), typeof(int), typeof(bool), typeof(bool) }),
                 postfix: new HarmonyMethod(typeof(ObjectPatches), nameof(ObjectPatches.InventoryMenu_Postfix))
             );
 
@@ -139,7 +133,7 @@ namespace CustomBackpack
             );
 
             harmony.Patch(
-                original: AccessTools.Method(typeof(GameLocation), nameof(GameLocation.answerDialogueAction)),
+                original: AccessTools.Method(typeof(GameLocation), nameof(GameLocation.answerDialogueAction), new Type[] { typeof(string), typeof(string[]) }),
                 prefix: new HarmonyMethod(typeof(ObjectPatches), nameof(ObjectPatches.GameLocation_answerDialogueAction_Prefix))
             );
 
@@ -166,7 +160,7 @@ namespace CustomBackpack
 
         private void GameLoop_UpdateTicked(object sender, StardewModdingAPI.Events.UpdateTickedEventArgs e)
         {
-            if(scrolling.Value && (Game1.activeClickableMenu is null || Game1.input.GetMouseState().LeftButton != ButtonState.Pressed))
+            if (scrolling.Value && (Game1.activeClickableMenu is null || Game1.input.GetMouseState().LeftButton != ButtonState.Pressed))
             {
                 scrolling.Value = false;
             }
@@ -182,7 +176,7 @@ namespace CustomBackpack
 
         private void Input_ButtonPressed(object sender, StardewModdingAPI.Events.ButtonPressedEventArgs e)
         {
-            if(Game1.activeClickableMenu is not null && e.Button == SButton.MouseLeft && scrollArea.Value.Contains(Game1.getMouseX(), Game1.getMouseY()))
+            if (Game1.activeClickableMenu is not null && e.Button == SButton.MouseLeft && scrollArea.Value.Contains(Game1.getMouseX(), Game1.getMouseY()))
             {
                 scrolling.Value = true;
             }
@@ -192,9 +186,10 @@ namespace CustomBackpack
         {
             return new CustomBackpackApi();
         }
+
         private void SetSlots(string arg1, string[] arg2)
         {
-            if(arg2.Length == 1 && int.TryParse(arg2[0], out int slots))
+            if (arg2.Length == 1 && int.TryParse(arg2[0], out int slots))
             {
                 SetPlayerSlots(slots);
             }
@@ -243,13 +238,10 @@ namespace CustomBackpack
 
         private void GameLoop_GameLaunched(object sender, StardewModdingAPI.Events.GameLaunchedEventArgs e)
         {
-
-            // get Generic Mod Config Menu's API (if it's installed)
             var configMenu = this.Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
             if (configMenu is null)
                 return;
 
-            // register mod
             configMenu.Register(
                 mod: ModManifest,
                 reset: () => Config = new ModConfig(),
