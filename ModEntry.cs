@@ -51,13 +51,14 @@ namespace CustomBackpack
                 return;
 
             context = this;
+
             SMonitor = Monitor;
             SHelper = helper;
 
             helper.Events.Content.AssetRequested += Content_AssetRequested;
             helper.Events.GameLoop.GameLaunched += GameLoop_GameLaunched;
             helper.Events.GameLoop.SaveLoaded += GameLoop_SaveLoaded;
-            helper.Events.GameLoop.DayStarted += GameLoop_DayStarted;
+            helper.Events.DayStarted += GameLoop_DayStarted;
             helper.Events.Input.ButtonPressed += Input_ButtonPressed;
             helper.Events.GameLoop.UpdateTicked += GameLoop_UpdateTicked;
 
@@ -65,7 +66,6 @@ namespace CustomBackpack
 
             var harmony = new Harmony(ModManifest.UniqueID);
 
-            // 1.6 Constructor Patch (11 parameters)
             harmony.Patch(
                 original: AccessTools.Constructor(typeof(InventoryMenu), new Type[] { typeof(int), typeof(int), typeof(bool), typeof(IList<Item>), typeof(InventoryMenu.highlightThisItem), typeof(int), typeof(int), typeof(int), typeof(int), typeof(bool), typeof(bool) }),
                 postfix: new HarmonyMethod(typeof(ObjectPatches), nameof(ObjectPatches.InventoryMenu_Postfix))
