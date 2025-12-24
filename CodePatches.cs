@@ -23,7 +23,7 @@ namespace CustomBackpack
 
         public class ObjectPatches
         {
-            public static void InventoryMenu_Postfix(InventoryMenu __instance, int xPosition, int yPosition, bool playerInventory, IList<Item> actualInventory, InventoryMenu.highlightThisItem highlightMethod, int capacity, int rows, int horizontalGap, int verticalGap, bool drawSlots)
+            public static void InventoryMenu_Postfix(InventoryMenu __instance, int xPosition, int yPosition, bool playerInventory, IList<Item> actualInventory, InventoryMenu.highlightThisItem highlightMethod, int capacity, int rows, int horizontalGap, int verticalGap, bool drawSlots, bool drawShadows)
             {
                 if (!Config.ModEnabled || (__instance.actualInventory != Game1.player.Items) || __instance.capacity >= __instance.actualInventory.Count)
                     return;
@@ -35,7 +35,6 @@ namespace CustomBackpack
                 oldRows.Value = rows;
                 oldCapacity.Value = capacity;
 
-                SMonitor.Log($"Created new inventory menu with {__instance.actualInventory.Count} slots", LogLevel.Trace);
                 upArrow = new ClickableTextureComponent(new Rectangle(__instance.xPositionOnScreen + 768 + 32 - 50, __instance.yPositionOnScreen - 46, 24, 24), Game1.mouseCursors, Game1.getSourceRectForStandardTileSheet(Game1.mouseCursors, 12, -1, -1), 0.4f, false)
                 {
                     myID = 88,
@@ -112,7 +111,7 @@ namespace CustomBackpack
                 return true;
             }
 
-            public static bool InventoryMenu_leftClick_Prefix(InventoryMenu __instance, int x, int y, Item toPlace, ref Item __result)
+            public static bool InventoryMenu_leftClick_Prefix(InventoryMenu __instance, int x, int y, Item toPlace, bool playSound, ref Item __result)
             {
                 if (!Config.ModEnabled || (__instance.actualInventory != Game1.player.Items) || __instance.capacity >= __instance.actualInventory.Count)
                     return true;
@@ -124,7 +123,7 @@ namespace CustomBackpack
                 return true;
             }
 
-            public static bool InventoryMenu_rightClick_Prefix(InventoryMenu __instance, int x, int y, Item toAddTo, ref Item __result)
+            public static bool InventoryMenu_rightClick_Prefix(InventoryMenu __instance, int x, int y, Item toAddTo, bool playSound, bool longPress, ref Item __result)
             {
                 if (!Config.ModEnabled || !__instance.playerInventory || __instance.capacity >= __instance.actualInventory.Count)
                     return true;
@@ -205,57 +204,6 @@ namespace CustomBackpack
                 return false;
             }
 
-            public static bool ItemGrabMenu_customSnapBehavior_Prefix(ItemGrabMenu __instance, int direction, int oldRegion, int oldID)
-            {
-                if (!Config.ModEnabled || __instance.inventory == null || !__instance.inventory.Scrolling()) return true;
-                InventoryMenu inventory = __instance.inventory;
-                int num = inventory.Columns();
-                if (direction == 2)
-                {
-                    if (inventory.inventory != null && inventory.inventory.Count >= __instance.GetColumnCount() && __instance.shippingBin)
-                    {
-                        for (int i = 0; i < num; i++)
-                            inventory.inventory[i + inventory.GetOffset()].upNeighborID = (__instance.shippingBin ? 12598 : (Math.Min(i, __instance.ItemsToGrabMenu.inventory.Count - 1) + 53910));
-                    }
-                    if (oldID >= IDOffset && oldID < IDOffset + inventory.capacity && oldID >= IDOffset + inventory.capacity - num && scrolled.Value < inventory.actualInventory.Count / num - inventory.rows)
-                    {
-                        ChangeScroll(inventory, 1);
-                        __instance.currentlySnappedComponent = __instance.getComponentWithID(oldID);
-                    }
-                    else if (!__instance.shippingBin && oldID >= 53910)
-                    {
-                        int num2 = oldID - 53910;
-                        if (num2 + __instance.GetColumnCount() <= __instance.ItemsToGrabMenu.inventory.Count - 1)
-                        {
-                            __instance.currentlySnappedComponent = __instance.getComponentWithID(num2 + __instance.GetColumnCount() + 53910);
-                            __instance.snapCursorToCurrentSnappedComponent();
-                            return false;
-                        }
-                    }
-                    else __instance.currentlySnappedComponent = __instance.getComponentWithID((oldRegion == 12598) ? IDOffset : (IDOffset + (oldID - 53910) % __instance.GetColumnCount()));
-                }
-                else if (direction == 0)
-                {
-                    if (oldID >= IDOffset && oldID < IDOffset + num)
-                    {
-                        if (scrolled.Value > 0)
-                        {
-                            ChangeScroll(inventory, -1);
-                            __instance.currentlySnappedComponent = __instance.getComponentWithID(oldID);
-                        }
-                        else if (__instance.shippingBin && Game1.getFarm().lastItemShipped != null)
-                        {
-                            __instance.currentlySnappedComponent = __instance.getComponentWithID(12598);
-                            __instance.currentlySnappedComponent.downNeighborID = oldID;
-                        }
-                    }
-                    else if (oldID >= IDOffset + inventory.Columns()) __instance.currentlySnappedComponent = __instance.getComponentWithID(oldID - inventory.Columns());
-                    else return true;
-                }
-                __instance.snapCursorToCurrentSnappedComponent();
-                return false;
-            }
-
             public static void InventoryMenu_draw_Prefix(InventoryMenu __instance, ref object[] __state)
             {
                 try
@@ -284,28 +232,12 @@ namespace CustomBackpack
                 catch (Exception value) { SMonitor.Log($"Failed in InventoryMenu_draw_Postfix:\n{value}", LogLevel.Error); }
             }
 
-            public static bool SeedShop_draw_Prefix(SeedShop __instance, SpriteBatch b)
+            public static bool GameLocation_performAction_Prefix(GameLocation __instance, string fullActionString, Farmer who, Location tileLocation, ref bool __result)
             {
-                if (!Config.ModEnabled || !dataDict.Any()) return true;
-                IntPtr functionPointer = AccessTools.Method(typeof(GameLocation), "draw", new Type[1] { typeof(SpriteBatch) }).MethodHandle.GetFunctionPointer();
-                Action<SpriteBatch> func = (Action<SpriteBatch>)Activator.CreateInstance(typeof(Action<SpriteBatch>), __instance, functionPointer);
-                func(b);
-                List<int> list = dataDict.Keys.ToList();
-                list.Sort();
-                foreach (int item in list)
-                {
-                    if (Game1.player.MaxItems < item)
-                    {
-                        b.Draw(dataDict[item].texture, Game1.GlobalToLocal(Config.BackpackPosition), dataDict[item].textureRect, Color.White, 0f, Vector2.Zero, 4f, SpriteEffects.None, 0.1232f);
-                        return false;
-                    }
-                }
-                return false;
-            }
+                if (!Config.ModEnabled || !dataDict.Any() || string.IsNullOrWhiteSpace(fullActionString)) return true;
+                string[] action = fullActionString.Split(' ');
+                if (action[0] != "BuyBackpack") return true;
 
-            public static bool GameLocation_performAction_Prefix(GameLocation __instance, string[] action, Farmer who, Location tileLocation, ref bool __result)
-            {
-                if (!Config.ModEnabled || !dataDict.Any() || action[0] != "BuyBackpack") return true;
                 List<int> list = dataDict.Keys.ToList();
                 list.Sort();
                 foreach (int item in list)
@@ -336,7 +268,7 @@ namespace CustomBackpack
                         if (Game1.player.Money >= dataDict[item].cost)
                         {
                             Game1.player.Money -= dataDict[item].cost;
-                            SetPlayerSlots(item);
+                            context.SetPlayerSlots(item);
                             Game1.player.holdUpItemThenMessage(new SpecialItem(99, dataDict[item].name), true);
                             ((Multiplayer)typeof(Game1).GetField("multiplayer", BindingFlags.Static | BindingFlags.NonPublic).GetValue(Game1.game1)).globalChatInfoMessage($"CustomBackpack_{item}", new string[1] { Game1.player.Name });
                         }
@@ -345,13 +277,6 @@ namespace CustomBackpack
                         return false;
                     }
                 }
-                return false;
-            }
-
-            public static bool SpecialItem_displayName_Prefix(SpecialItem __instance, ref string __result)
-            {
-                if (!Config.ModEnabled || __instance.which.Value != 99 || !dataDict.Any()) return true;
-                __result = __instance.Name;
                 return false;
             }
 
