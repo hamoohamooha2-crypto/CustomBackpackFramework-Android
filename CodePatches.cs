@@ -23,7 +23,7 @@ namespace CustomBackpack
         public static ClickableTextureComponent expandButton;
 
         public class ObjectPatches {
-            public static void InventoryMenu_Postfix(InventoryMenu __instance, int xPosition, int yPosition, bool playerInventory, IList<Item> actualInventory, InventoryMenu.highlightThisItem highlightMethod, int capacity, int rows, int horizontalGap, int verticalGap, bool drawSlots, bool highlightSelected)
+            public static void InventoryMenu_Postfix(InventoryMenu __instance, int xPosition, int yPosition, bool playerInventory, IList<Item> actualInventory, InventoryMenu.highlightThisItem highlightMethod, int capacity, int rows, int horizontalGap, int verticalGap, bool drawSlots)
             {
                 if (!Config.ModEnabled || (__instance.actualInventory != Game1.player.Items) || __instance.capacity >= __instance.actualInventory.Count)
                     return;
@@ -76,7 +76,6 @@ namespace CustomBackpack
                     };
                     __instance.inventory.Add(cc);
                 }
-
             }
 
             public static void InventoryMenu_hover_Prefix(InventoryMenu __instance, int x, int y)
@@ -142,8 +141,6 @@ namespace CustomBackpack
                 {
                     var bounds = __instance.inventory[scrolled.Value * __instance.capacity / __instance.rows].bounds;
                     Game1.setMousePosition(bounds.Right - bounds.Width / 8, bounds.Bottom - bounds.Height / 8);
-                    var x = Game1.getMousePosition();
-                    var y = x;
                 }
             }
 
@@ -185,7 +182,6 @@ namespace CustomBackpack
                 int columns = menu.Columns();
                 if(__instance is ItemGrabMenu && menu.inventory != null && menu.inventory.Count >= (__instance as ItemGrabMenu).GetColumnCount())
                 {
-                    SMonitor.Log($"items to grab {(__instance as ItemGrabMenu).ItemsToGrabMenu.inventory.Count}");
                     for (int i = 0; i < columns; i++)
                     {
                         menu.inventory[i + menu.GetOffset()].upNeighborID = ((__instance as ItemGrabMenu).shippingBin ? 12598 : (Math.Min(i, (__instance as ItemGrabMenu).ItemsToGrabMenu.inventory.Count - 1) + 53910));
@@ -240,7 +236,6 @@ namespace CustomBackpack
                 }
                 else
                 {
-                    SMonitor.Log($"b {direction}, {old.myID}, {old.upNeighborID}, {old.downNeighborID}");
                     return true;
                 }
                 __instance.snapCursorToCurrentSnappedComponent();
@@ -266,7 +261,6 @@ namespace CustomBackpack
                             menu.inventory[i + menu.GetOffset()].upNeighborID = (__instance.shippingBin ? 12598 : (Math.Min(i, __instance.ItemsToGrabMenu.inventory.Count - 1) + 53910));
                         }
                     }
-                    SMonitor.Log($"{oldID}, {menu.capacity}, {scrolled.Value}");
                     if (oldID >= IDOffset && oldID < IDOffset + menu.capacity && oldID >= IDOffset + menu.capacity - columns && scrolled.Value < menu.actualInventory.Count / columns - menu.rows)
                     {
                         ChangeScroll(menu, 1);
@@ -326,10 +320,7 @@ namespace CustomBackpack
 
                     __instance.actualInventory = new List<Item>(__instance.actualInventory.Skip(__instance.capacity / __instance.rows * scrolled.Value).Take(__instance.capacity));
                     __instance.inventory = new List<ClickableComponent>(__instance.inventory.Skip(__instance.capacity / __instance.rows * scrolled.Value).Take(__instance.capacity));
-                } catch (Exception ex)
-                {
-                    SMonitor.Log($"Failed in {nameof(InventoryMenu_draw_Prefix)}:\n{ex}", LogLevel.Error);
-                }
+                } catch (Exception) { }
             }
             public static void InventoryMenu_draw_Postfix(SpriteBatch b, InventoryMenu __instance, ref object[] __state)
             {
@@ -340,10 +331,7 @@ namespace CustomBackpack
                     __instance.actualInventory = (IList<Item>)__state[0];
                     __instance.inventory = (List<ClickableComponent>)__state[1];
                     DrawUIElements(b, __instance);
-                } catch (Exception ex)
-                {
-                    SMonitor.Log($"Failed in {nameof(InventoryMenu_draw_Postfix)}:\n{ex}", LogLevel.Error);
-                }
+                } catch (Exception) { }
             }
 
             public static bool SeedShop_draw_Prefix(SeedShop __instance, SpriteBatch b)
@@ -352,7 +340,7 @@ namespace CustomBackpack
                     return true;
 
                 var ptr = AccessTools.Method(typeof(GameLocation), "draw", new Type[] { typeof(SpriteBatch) }).MethodHandle.GetFunctionPointer();
-                var baseMethod = (Func<SpriteBatch, GameLocation>)Activator.CreateInstance(typeof(Func<SpriteBatch, GameLocation>), __instance, ptr);
+                var baseMethod = (Action<SpriteBatch>)Activator.CreateInstance(typeof(Action<SpriteBatch>), __instance, ptr);
                 baseMethod(b);
 
                 var list = dataDict.Keys.ToList();
@@ -382,7 +370,6 @@ namespace CustomBackpack
                 {
                     if (Game1.player.maxItems.Value < i)
                     {
-                        SMonitor.Log($"showing dialogue to buy backpack {dataDict[i].name} for {dataDict[i].cost}");
                         __instance.createQuestionDialogue(string.Format(SHelper.Translation.Get("backpack-upgrade-x"), i), new Response[]
                         {
                             new Response("Purchase", string.Format(SHelper.Translation.Get("buy-backpack-for-x"), dataDict[i].cost)),
@@ -407,7 +394,6 @@ namespace CustomBackpack
                     {
                         if (Game1.player.Money >= dataDict[i].cost)
                         {
-                            SMonitor.Log($"buying backpack {dataDict[i].name} for {dataDict[i].cost}");
                             Game1.player.Money -= dataDict[i].cost;
                             SetPlayerSlots(i);
                             Game1.player.holdUpItemThenMessage(new SpecialItem(99, dataDict[i].name), true);
@@ -455,7 +441,7 @@ namespace CustomBackpack
 
             public static bool Farmer_shiftToolbar_Prefix(Farmer __instance, bool right)
             {
-                if (!Config.ModEnabled || Config.ShiftRows < 1 || Config.ShiftRows >= __instance.Items.Count / 12 || __instance.Items is null || __instance.Items.Count < 37 || __instance.UsingTool || Game1.dialogueUp || !__instance.CanMove || __instance.Items.HasAny() || Game1.eventUp || Game1.farmEvent != null)
+                if (!Config.ModEnabled || Config.ShiftRows < 1 || Config.ShiftRows >= __instance.Items.Count / 12 || __instance.Items is null || __instance.Items.Count < 37 || __instance.UsingTool || Game1.dialogueUp || !__instance.CanMove || __instance.Items.Count == 0 || Game1.eventUp || Game1.farmEvent != null)
                     return true;
                 if (Config.ShiftRows == 1)
                     return false;
@@ -507,6 +493,22 @@ namespace CustomBackpack
                     }
                 }
                 return false;
+            }
+        }
+
+        public class FullInventoryPage : InventoryPage
+        {
+            // Android 1.5 Constructor requires 5 args
+            public FullInventoryPage(int x, int y, int width, int height, bool treasure = false) : base(x, y, width, height, treasure) { }
+
+            public override void receiveLeftClick(int x, int y, bool playSound = true)
+            {
+                base.receiveLeftClick(x, y, playSound);
+            }
+
+            public override void receiveRightClick(int x, int y, bool playSound = true)
+            {
+                base.receiveRightClick(x, y, playSound);
             }
         }
     }
