@@ -7,68 +7,75 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using StardewModdingAPI;
+using System.Linq;
 
 namespace CustomBackpack
 {
     public static class PatchHandler
     {
-        public static void SafePatchAll(Harmony harmony, Type patchClass)
+        public static void SafePatchAll(Harmony harmony, Type patchClass, IMonitor monitor)
         {
-            var invConstructor = AccessTools.Constructor(typeof(InventoryMenu), new[] { 
-                typeof(int), typeof(int), typeof(bool), typeof(IList<Item>), 
-                typeof(InventoryMenu.highlightThisItem), typeof(int), typeof(int), 
-                typeof(int), typeof(int), typeof(bool), typeof(bool) 
-            });
-            
-            if (invConstructor != null)
-                harmony.Patch(invConstructor, postfix: new HarmonyMethod(patchClass, "InventoryMenu_Postfix"));
+            // 1. InventoryMenu Constructor
+            var invConstructor = FindConstructor(typeof(InventoryMenu));
+            PatchSafe(harmony, monitor, patchClass, invConstructor, null, "InventoryMenu_Postfix", "InventoryMenu Constructor");
 
-            var drawMethod = AccessTools.Method(typeof(InventoryMenu), nameof(InventoryMenu.draw), new[] { 
-                typeof(SpriteBatch), typeof(int), typeof(int), typeof(int) 
-            });
+            // 2. InventoryMenu.draw
+            var drawMethod = FindMethod(typeof(InventoryMenu), "draw");
+            PatchSafe(harmony, monitor, patchClass, drawMethod, "InventoryMenu_draw_Prefix", "InventoryMenu_draw_Postfix", "InventoryMenu Draw");
 
-            if (drawMethod != null)
+            // 3. InventoryMenu.rightClick
+            var rightClick = FindMethod(typeof(InventoryMenu), "rightClick");
+            PatchSafe(harmony, monitor, patchClass, rightClick, "InventoryMenu_rightClick_Prefix", null, "InventoryMenu RightClick");
+
+            // 4. GameLocation.performAction
+            var performAction = FindMethod(typeof(GameLocation), "performAction");
+            PatchSafe(harmony, monitor, patchClass, performAction, "GameLocation_performAction_Prefix", null, "GameLocation PerformAction");
+
+            // 5. GameLocation.answerDialogueAction
+            var answerDialogue = FindMethod(typeof(GameLocation), "answerDialogueAction");
+            PatchSafe(harmony, monitor, patchClass, answerDialogue, "GameLocation_answerDialogueAction_Prefix", null, "GameLocation AnswerDialogue");
+
+            // 6. Standard Hooks
+            PatchSafe(harmony, monitor, patchClass, AccessTools.Method(typeof(Farmer), "shiftToolbar"), "Farmer_shiftToolbar_Prefix", null, "Farmer ShiftToolbar");
+            PatchSafe(harmony, monitor, patchClass, AccessTools.Method(typeof(IClickableMenu), "applyMovementKey"), "IClickableMenu_applyMovementKey_Prefix", null, "MovementKey");
+        }
+
+        private static MethodBase FindConstructor(Type type)
+        {
+            // Mobile 1.6 Constructor can vary (10 or 11 params). We take the one with the most parameters.
+            return type.GetConstructors().OrderByDescending(c => c.GetParameters().Length).FirstOrDefault();
+        }
+
+        private static MethodBase FindMethod(Type type, string name)
+        {
+            // Android builds sometimes rename or overload methods. 
+            // We look for the method by name and match the most likely candidate for patching.
+            return type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static)
+                       .Where(m => m.Name == name)
+                       .OrderByDescending(m => m.GetParameters().Length)
+                       .FirstOrDefault();
+        }
+
+        private static void PatchSafe(Harmony harmony, IMonitor monitor, Type patchClass, MethodBase original, string prefixName, string postfixName, string debugName)
+        {
+            if (original == null)
             {
-                harmony.Patch(drawMethod, prefix: new HarmonyMethod(patchClass, "InventoryMenu_draw_Prefix"));
-                harmony.Patch(drawMethod, postfix: new HarmonyMethod(patchClass, "InventoryMenu_draw_Postfix"));
+                monitor.Log($"[Critical] {debugName} not found! This feature will be disabled.", LogLevel.Warn);
+                return;
             }
 
-            var rightClick = AccessTools.Method(typeof(InventoryMenu), nameof(InventoryMenu.rightClick), new[] { 
-                typeof(int), typeof(int), typeof(Item), typeof(bool), typeof(bool) 
-            });
-
-            if (rightClick != null)
-                harmony.Patch(rightClick, prefix: new HarmonyMethod(patchClass, "InventoryMenu_rightClick_Prefix"));
-
-            var performAction = AccessTools.Method(typeof(GameLocation), nameof(GameLocation.performAction), new[] { 
-                typeof(string[]), typeof(Farmer), typeof(xTile.Dimensions.Location) 
-            });
-
-            if (performAction != null)
-                harmony.Patch(performAction, prefix: new HarmonyMethod(patchClass, "GameLocation_performAction_Prefix"));
-
-            var answerDialogue = AccessTools.Method(typeof(GameLocation), nameof(GameLocation.answerDialogueAction), new[] { 
-                typeof(string), typeof(string[]) 
-            });
-            
-            if (answerDialogue != null)
-                harmony.Patch(answerDialogue, prefix: new HarmonyMethod(patchClass, "GameLocation_answerDialogueAction_Prefix"));
-
-            var shiftToolbar = AccessTools.Method(typeof(Farmer), nameof(Farmer.shiftToolbar));
-            if (shiftToolbar != null)
-                harmony.Patch(shiftToolbar, prefix: new HarmonyMethod(patchClass, "Farmer_shiftToolbar_Prefix"));
-
-            var applyMovement = AccessTools.Method(typeof(IClickableMenu), nameof(IClickableMenu.applyMovementKey));
-            if (applyMovement != null)
-                harmony.Patch(applyMovement, prefix: new HarmonyMethod(patchClass, "IClickableMenu_applyMovementKey_Prefix"));
-
-            var shopHover = AccessTools.Method(typeof(ShopMenu), nameof(ShopMenu.performHoverAction));
-            if (shopHover != null)
-                harmony.Patch(shopHover, prefix: new HarmonyMethod(patchClass, "ShopMenu_performHoverAction_Prefix"));
-            
-            var invHover = AccessTools.Method(typeof(InventoryMenu), nameof(InventoryMenu.hover));
-            if (invHover != null)
-                harmony.Patch(invHover, prefix: new HarmonyMethod(patchClass, "InventoryMenu_hover_Prefix"));
+            try
+            {
+                HarmonyMethod prefix = prefixName != null ? new HarmonyMethod(patchClass, prefixName) : null;
+                HarmonyMethod postfix = postfixName != null ? new HarmonyMethod(patchClass, postfixName) : null;
+                
+                harmony.Patch(original, prefix, postfix);
+                monitor.Log($"[Success] {debugName} patched (Params: {original.GetParameters().Length})", LogLevel.Trace);
+            }
+            catch (Exception ex)
+            {
+                monitor.Log($"[Error] Failed to patch {debugName}: {ex.Message}", LogLevel.Error);
+            }
         }
     }
 }
