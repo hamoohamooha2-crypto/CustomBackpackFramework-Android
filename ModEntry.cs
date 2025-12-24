@@ -11,6 +11,7 @@ using StardewValley.Objects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using xTile.Dimensions;
 using Rectangle = Microsoft.Xna.Framework.Rectangle;
 
@@ -58,50 +59,7 @@ namespace CustomBackpack
             helper.ConsoleCommands.Add("custombackpack", "Usage: custombackpack <slotnumber>", SetSlots);
 
             var harmony = new Harmony(ModManifest.UniqueID);
-
-            harmony.Patch(
-                original: AccessTools.Constructor(typeof(InventoryMenu), new Type[] { typeof(int), typeof(int), typeof(bool), typeof(IList<Item>), typeof(InventoryMenu.highlightThisItem), typeof(int), typeof(int), typeof(int), typeof(int), typeof(bool), typeof(bool) }),
-                postfix: new HarmonyMethod(typeof(ObjectPatches), nameof(ObjectPatches.InventoryMenu_Postfix))
-            );
-
-            harmony.Patch(
-                original: AccessTools.Method(typeof(InventoryMenu), nameof(InventoryMenu.hover), new Type[] { typeof(int), typeof(int) }),
-                prefix: new HarmonyMethod(typeof(ObjectPatches), nameof(ObjectPatches.InventoryMenu_hover_Prefix))
-            );
-
-            harmony.Patch(
-                original: AccessTools.Method(typeof(InventoryMenu), nameof(InventoryMenu.getInventoryPositionOfClick), new Type[] { typeof(int), typeof(int), typeof(bool) }),
-                prefix: new HarmonyMethod(typeof(ObjectPatches), nameof(ObjectPatches.InventoryMenu_getInventoryPositionOfClick_Prefix))
-            );
-
-            harmony.Patch(
-                original: AccessTools.Method(typeof(InventoryMenu), nameof(InventoryMenu.leftClick), new Type[] { typeof(int), typeof(int), typeof(Item), typeof(bool) }),
-                prefix: new HarmonyMethod(typeof(ObjectPatches), nameof(ObjectPatches.InventoryMenu_leftClick_Prefix))
-            );
-
-            harmony.Patch(
-                original: AccessTools.Method(typeof(InventoryMenu), nameof(InventoryMenu.rightClick), new Type[] { typeof(int), typeof(int), typeof(Item), typeof(bool), typeof(bool) }),
-                prefix: new HarmonyMethod(typeof(ObjectPatches), nameof(ObjectPatches.InventoryMenu_rightClick_Prefix))
-            );
-
-            harmony.Patch(
-                original: AccessTools.Method(typeof(InventoryMenu), nameof(InventoryMenu.draw), new Type[] { typeof(SpriteBatch), typeof(int), typeof(int), typeof(int) }),
-                prefix: new HarmonyMethod(typeof(ObjectPatches), nameof(ObjectPatches.InventoryMenu_draw_Prefix)),
-                postfix: new HarmonyMethod(typeof(ObjectPatches), nameof(ObjectPatches.InventoryMenu_draw_Postfix))
-            );
-
-            harmony.Patch(
-                original: AccessTools.Method(typeof(GameLocation), nameof(GameLocation.performAction), new Type[] { typeof(string[]), typeof(Farmer), typeof(Location) }),
-                prefix: new HarmonyMethod(typeof(ObjectPatches), nameof(ObjectPatches.GameLocation_performAction_Prefix))
-            );
-
-            harmony.Patch(
-                original: AccessTools.Method(typeof(GameLocation), nameof(GameLocation.answerDialogueAction), new Type[] { typeof(string), typeof(string[]) }),
-                prefix: new HarmonyMethod(typeof(ObjectPatches), nameof(ObjectPatches.GameLocation_answerDialogueAction_Prefix))
-            );
-
-            harmony.Patch(original: AccessTools.Method(typeof(InventoryMenu), nameof(InventoryMenu.setUpForGamePadMode)), postfix: new HarmonyMethod(typeof(ObjectPatches), nameof(ObjectPatches.InventoryMenu_setUpForGamePadMode_Postfix)));
-            harmony.Patch(original: AccessTools.Method(typeof(Farmer), nameof(Farmer.shiftToolbar), new Type[] { typeof(bool) }), prefix: new HarmonyMethod(typeof(ObjectPatches), nameof(ObjectPatches.Farmer_shiftToolbar_Prefix)));
+            PatchHandler.SafePatchAll(harmony, typeof(ObjectPatches), Monitor);
 
             scrollTexture = new Texture2D(Game1.graphics.GraphicsDevice, 1, 1);
             scrollTexture.SetData(new Color[] { Config.BackgroundColor });
@@ -180,6 +138,52 @@ namespace CustomBackpack
             configMenu.Register(mod: ModManifest, reset: () => Config = new ModConfig(), save: () => Helper.WriteConfig(Config));
             configMenu.AddBoolOption(mod: ModManifest, name: () => ModEntry.SHelper.Translation.Get("GMCM_Option_ModEnabled_Name"), getValue: () => Config.ModEnabled, setValue: value => Config.ModEnabled = value);
             configMenu.AddNumberOption(mod: ModManifest, name: () => ModEntry.SHelper.Translation.Get("GMCM_Option_MinHandleHeight_Name"), getValue: () => Config.MinHandleHeight, setValue: value => Config.MinHandleHeight = value);
+        }
+    }
+
+    public static class PatchHandler
+    {
+        public static void SafePatchAll(Harmony harmony, Type patchClass, IMonitor monitor)
+        {
+            PatchSafe(harmony, monitor, patchClass, FindConstructor(typeof(InventoryMenu)), null, "InventoryMenu_Postfix", "InventoryMenu Constructor");
+            PatchSafe(harmony, monitor, patchClass, FindMethod(typeof(InventoryMenu), "draw"), "InventoryMenu_draw_Prefix", "InventoryMenu_draw_Postfix", "InventoryMenu Draw");
+            PatchSafe(harmony, monitor, patchClass, FindMethod(typeof(InventoryMenu), "rightClick"), "InventoryMenu_rightClick_Prefix", null, "InventoryMenu RightClick");
+            PatchSafe(harmony, monitor, patchClass, FindMethod(typeof(InventoryMenu), "leftClick"), "InventoryMenu_leftClick_Prefix", null, "InventoryMenu LeftClick");
+            PatchSafe(harmony, monitor, patchClass, FindMethod(typeof(InventoryMenu), "hover"), "InventoryMenu_hover_Prefix", null, "InventoryMenu Hover");
+            PatchSafe(harmony, monitor, patchClass, FindMethod(typeof(InventoryMenu), "getInventoryPositionOfClick"), "InventoryMenu_getInventoryPositionOfClick_Prefix", null, "InventoryMenu ClickPos");
+            PatchSafe(harmony, monitor, patchClass, FindMethod(typeof(GameLocation), "performAction"), "GameLocation_performAction_Prefix", null, "GameLocation PerformAction");
+            PatchSafe(harmony, monitor, patchClass, FindMethod(typeof(GameLocation), "answerDialogueAction"), "GameLocation_answerDialogueAction_Prefix", null, "GameLocation AnswerDialogue");
+            PatchSafe(harmony, monitor, patchClass, AccessTools.Method(typeof(Farmer), "shiftToolbar"), "Farmer_shiftToolbar_Prefix", null, "Farmer ShiftToolbar");
+            PatchSafe(harmony, monitor, patchClass, AccessTools.Method(typeof(IClickableMenu), "applyMovementKey"), "IClickableMenu_applyMovementKey_Prefix", null, "MovementKey");
+            PatchSafe(harmony, monitor, patchClass, AccessTools.Method(typeof(InventoryMenu), "setUpForGamePadMode"), null, "InventoryMenu_setUpForGamePadMode_Postfix", "GamePadMode");
+        }
+
+        private static MethodBase FindConstructor(Type type)
+        {
+            return type.GetConstructors().OrderByDescending(c => c.GetParameters().Length).FirstOrDefault();
+        }
+
+        private static MethodBase FindMethod(Type type, string name)
+        {
+            return type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static)
+                       .Where(m => m.Name == name)
+                       .OrderByDescending(m => m.GetParameters().Length)
+                       .FirstOrDefault();
+        }
+
+        private static void PatchSafe(Harmony harmony, IMonitor monitor, Type patchClass, MethodBase original, string prefixName, string postfixName, string debugName)
+        {
+            if (original == null) return;
+            try
+            {
+                HarmonyMethod prefix = prefixName != null ? new HarmonyMethod(patchClass, prefixName) : null;
+                HarmonyMethod postfix = postfixName != null ? new HarmonyMethod(patchClass, postfixName) : null;
+                harmony.Patch(original, prefix, postfix);
+            }
+            catch (Exception ex)
+            {
+                monitor.Log($"Failed to patch {debugName}: {ex.Message}", LogLevel.Error);
+            }
         }
     }
 }
