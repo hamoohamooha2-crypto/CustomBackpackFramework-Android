@@ -23,5 +23,5 @@ jobs:
       - name: Upload DLL
         uses: actions/upload-artifact@v4
         with:
-          name: MiniPhone
+          name: CustomBackpackFramework
           path: bin/Release/net8.0/**/*.dll
