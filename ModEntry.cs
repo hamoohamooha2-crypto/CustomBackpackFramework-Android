@@ -27,21 +27,12 @@ namespace CustomBackpack
         public static string dictPath = "platinummyr.CustomBackpackFramework/dictionary";
         public static Dictionary<int, BackPackData> dataDict = new();
 
-        public static int IDOffset = 0;
-
         public static Texture2D scrollTexture;
         public static Texture2D handleTexture;
 
-        public static PerScreen<IClickableMenu> lastMenu = new();
-        public static PerScreen<int> pressTime = new();
-        public static PerScreen<int> oldScrollValue = new();
-        public static PerScreen<int> oldCapacity = new();
-        public static PerScreen<int> oldRows = new();
-        public static PerScreen<int> oldScrolled = new();
-        public static PerScreen<int> scrolled = new();
-        public static PerScreen<int> scrollChange = new();
-        public static PerScreen<int> scrollWidth = new(() => 4);
         public static PerScreen<bool> scrolling = new();
+        public static PerScreen<int> oldScrollValue = new();
+        public static PerScreen<int> scrollChange = new();
         public static PerScreen<Rectangle> scrollArea = new();
 
         public override void Entry(IModHelper helper)
@@ -54,17 +45,21 @@ namespace CustomBackpack
             SMonitor = Monitor;
             SHelper = helper;
 
-            helper.Events.Content.AssetRequested += Content_AssetRequested;
             helper.Events.GameLoop.GameLaunched += GameLoop_GameLaunched;
-            helper.Events.GameLoop.SaveLoaded += GameLoop_SaveLoaded;
-            helper.Events.GameLoop.DayStarted += GameLoop_DayStarted;
-            helper.Events.Input.ButtonPressed += Input_ButtonPressed;
+            helper.Events.GameLoop.SaveLoaded += (_, _) => LoadDict();
+            helper.Events.GameLoop.DayStarted += (_, _) => LoadDict();
             helper.Events.GameLoop.UpdateTicked += GameLoop_UpdateTicked;
+            helper.Events.Input.ButtonPressed += Input_ButtonPressed;
+            helper.Events.Content.AssetRequested += Content_AssetRequested;
 
-            helper.ConsoleCommands.Add("custombackpack", "custombackpack <slots>", SetSlots);
+            helper.ConsoleCommands.Add(
+                "custombackpack",
+                "custombackpack <slots>",
+                SetSlots
+            );
 
             var harmony = new Harmony(ModManifest.UniqueID);
-            PatchHandler.SafePatchAll(harmony, typeof(ObjectPatches), Monitor);
+            PatchHandler.SafePatchAll(harmony, Monitor);
 
             scrollTexture = new Texture2D(Game1.graphics.GraphicsDevice, 1, 1);
             scrollTexture.SetData(new[] { Config.BackgroundColor });
@@ -75,26 +70,32 @@ namespace CustomBackpack
 
         private void GameLoop_UpdateTicked(object sender, StardewModdingAPI.Events.UpdateTickedEventArgs e)
         {
-            if (scrolling.Value && (Game1.activeClickableMenu == null || Game1.input.GetMouseState().LeftButton != ButtonState.Pressed))
+            if (scrolling.Value &&
+                (Game1.activeClickableMenu == null ||
+                 Game1.input.GetMouseState().LeftButton != ButtonState.Pressed))
+            {
                 scrolling.Value = false;
+            }
 
-            int newScroll = Game1.input.GetMouseState().ScrollWheelValue;
-            scrollChange.Value = oldScrollValue.Value > newScroll ? 1 : oldScrollValue.Value < newScroll ? -1 : 0;
-            oldScrollValue.Value = newScroll;
+            int newValue = Game1.input.GetMouseState().ScrollWheelValue;
+            scrollChange.Value =
+                oldScrollValue.Value > newValue ? 1 :
+                oldScrollValue.Value < newValue ? -1 : 0;
+
+            oldScrollValue.Value = newValue;
         }
 
         private void Input_ButtonPressed(object sender, StardewModdingAPI.Events.ButtonPressedEventArgs e)
         {
-            if (Game1.activeClickableMenu != null && e.Button == SButton.MouseLeft &&
+            if (Game1.activeClickableMenu != null &&
+                e.Button == SButton.MouseLeft &&
                 scrollArea.Value.Contains(Game1.getMouseX(), Game1.getMouseY()))
             {
                 scrolling.Value = true;
             }
         }
 
-        public override object GetApi() => new CustomBackpackApi();
-
-        private void SetSlots(string cmd, string[] args)
+        private void SetSlots(string _, string[] args)
         {
             if (args.Length == 1 && int.TryParse(args[0], out int slots))
                 SetPlayerSlots(slots);
@@ -110,9 +111,6 @@ namespace CustomBackpack
                 Game1.player.Items.Add(null);
         }
 
-        private void GameLoop_DayStarted(object sender, StardewModdingAPI.Events.DayStartedEventArgs e) => LoadDict();
-        private void GameLoop_SaveLoaded(object sender, StardewModdingAPI.Events.SaveLoadedEventArgs e) => LoadDict();
-
         private void LoadDict()
         {
             try
@@ -127,18 +125,42 @@ namespace CustomBackpack
         private void Content_AssetRequested(object sender, StardewModdingAPI.Events.AssetRequestedEventArgs e)
         {
             if (e.NameWithoutLocale.IsEquivalentTo(dictPath))
-                e.LoadFrom(() => new Dictionary<int, BackPackData>(), StardewModdingAPI.Events.AssetLoadPriority.Exclusive);
+            {
+                e.LoadFrom(
+                    () => new Dictionary<int, BackPackData>(),
+                    StardewModdingAPI.Events.AssetLoadPriority.Exclusive
+                );
+            }
         }
 
         private void GameLoop_GameLaunched(object sender, StardewModdingAPI.Events.GameLaunchedEventArgs e)
         {
-            var api = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
-            if (api == null)
+            var gmcm = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>(
+                "spacechase0.GenericModConfigMenu"
+            );
+
+            if (gmcm == null)
                 return;
 
-            api.Register(ModManifest, () => Config = new ModConfig(), () => Helper.WriteConfig(Config));
-            api.AddBoolOption(ModManifest, () => "Enable Mod", () => Config.ModEnabled, v => Config.ModEnabled = v);
-            api.AddNumberOption(ModManifest, () => "Min Handle Height", () => Config.MinHandleHeight, () => Config.MinHandleHeight, v => Config.MinHandleHeight = v);
+            gmcm.Register(
+                mod: ModManifest,
+                reset: () => Config = new ModConfig(),
+                save: () => Helper.WriteConfig(Config)
+            );
+
+            gmcm.AddBoolOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM_ModEnabled"),
+                getValue: () => Config.ModEnabled,
+                setValue: value => Config.ModEnabled = value
+            );
+
+            gmcm.AddNumberOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM_MinHandleHeight"),
+                getValue: () => Config.MinHandleHeight,
+                setValue: value => Config.MinHandleHeight = value
+            );
         }
     }
 }
